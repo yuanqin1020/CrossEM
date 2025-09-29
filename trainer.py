@@ -24,8 +24,6 @@ class GraphSAGE(nn.Module):
 
         return x
 
-
-# Use the trained model for inferring vertex reps
 def graphsage_inference(input_dim, data, test_classes):
 
     model = GraphSAGE(input_dim, 256, 128, "MEAN")
