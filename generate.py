@@ -23,11 +23,6 @@ from utils import *
 from baseline import patches_method, patches_simi_cache
 
 
-os.environ['CUDA_VISIBLE_DEVICES'] = "0,1"
-os.environ['CUDA_LAUNCH_BLOCKING'] = "0,1"
-
-
-
 """
     https://github.com/salesforce/LAVIS
     Image Captioning
@@ -36,10 +31,6 @@ class ConditionedText:
     def __init__(self, device):
         self.device = device
         
-        # self.model_type = "google/flan-t5-xl"
-        # self.tokenizer = T5Tokenizer.from_pretrained(self.model_name)
-        # self.model = T5ForConditionalGeneration.from_pretrained(self.model_name)
-        
         self.model, self.processor, _ = load_model_and_preprocess(name="blip2_t5", model_type="pretrain_flant5xl")
 
         print("blip flan t5 model load finish.")
@@ -47,7 +38,7 @@ class ConditionedText:
         self.model.eval()
         self.model.to(self.device)
         
-        clip_model_name = "/home/zhangjunyu/.cache/huggingface/hub/openai/clip-vit-base-patch32"
+        clip_model_name = ".../openai/clip-vit-base-patch32"
         self.clip_model = CLIPModel.from_pretrained(clip_model_name, local_files_only=True).to(device)
         self.clip_model.eval()
         self.clip_processor = CLIPProcessor.from_pretrained(clip_model_name, local_files_only=True)
@@ -77,29 +68,18 @@ class ConditionedText:
         batch = self.processor["eval"](image).unsqueeze(0).to(self.device)
         
         with torch.no_grad():
-            """
-            Args:
-                max_length (int): The maximum length of the sequence to be generated.
-                min_length (int): The minimum length of the sequence to be generated.
-                repetition_penalty (float): The parameter for repetition penalty. 1.0 means no penalty.
-            Returns:
-                captions (list): A list of strings of length batch_size * num_captions.
-            """
             captions = self.model.generate(
-                {"image": batch}, # samples (dict): image - A tensor of shape (batch_size, 3, H, W)
-                use_nucleus_sampling=True, # Whether to use nucleus sampling. If False, use top-k sampling
-                num_captions=num_captions,  # Number of captions to be generated for each image
-                top_p=0.95,    # The cumulative probability for nucleus sampling
+                {"image": batch}, 
+                use_nucleus_sampling=True, 
+                num_captions=num_captions,  
+                top_p=0.95,  
                 temperature=1.0, 
-                num_beams=1  # Number of beams for beam search. 1 means no beam search
+                num_beams=1  
             )
             
         ordered_captions, scores = self.score_captions(image, captions)
         return ordered_captions, scores
     
-
-
-
 
 class GuidanceModel:
     def __init__(self, device):
@@ -120,14 +100,6 @@ class GuidanceModel:
             
         return caption, scores
 
-''' 
-    {"image_path": "/mnt/data_02tb/deep/.cache/lavis/coco/images/train2017/000000017697.jpg", 
-    "text_input": "Question: The car is behind the suitcase. Answer:", "choices": ["false", "true"], "correct_choice_idx": 1, "hint": "", "lecture": "", "question_id": "test_0", 
-    "objects": "one backpack, one dog, one motorcycle, one person, one suitcase", 
-    "scene_graph": "tire on motorcycle <SEP> helmet on man <SEP> dog on motorcycle <SEP> man wearing shirt <SEP> man wearing helmet <SEP> motorcycle on street <SEP> man on motorcycle <SEP> helmet on head <SEP> light on motorcycle <SEP> man riding motorcycle", 
-    "captions": ["the man riding a motorcycle is wearing a mask", "a man on a motorcycle in a car with a dog on the seat", "man riding a motorcycle", "a woman on a motorbike riding her dog on the road", "a man is riding a motorcycle along a street with his pet walker", "person on motorcycle wearing hat and wearing helmet", "a man on a motorcycle with a dog", "two people on a motorcycle", "a man riding a motorcycle along a road", "man on motorcycle"], 
-    "scores": [32.49, 31.88, 30.88, 30.78, 30.77, 30.57, 30.33, 30.2, 29.93, 29.64]}
-'''
 def gen_img_json(file, img_paths):
     json_list = [{"image_path": item} for item in img_paths]
     file = file + ".json"
@@ -171,7 +143,7 @@ def gen_guidence(dir, task, img_paths, mode, device):
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root", type=str, default="/home/yuanqin/Align/", help="path to dataset") # /home/zhangjunyu/yq/Align/
+    parser.add_argument("--root", type=str, default="...", help="path to dataset") 
     parser.add_argument('--bert_name', default='bert-base-uncased', type=str, help="Pretrained language model name, bart-base or bart-large")
     parser.add_argument("--clip", type=str, default="", help="")
     parser.add_argument("--output", type=str, default="output/", help="output directory")
@@ -216,7 +188,6 @@ if __name__ == "__main__":
             handle_triples(args.root + args.data + "triplets.txt", args.root + args.data + "new_triplets.txt")
             file = 'new_triplets.txt' if args.new_trip != "" else 'triplets.txt'
             patches_method(args, train_img, args.device, dataset, "train", args.new_trip, file)
-            # patches_method(args, test_unseen_img, args.device, dataset, "test_unseen", args.new_trip)
             print(f"Patching complete for {dataset}")
 
     else:
@@ -224,5 +195,4 @@ if __name__ == "__main__":
         ratio = int(0.7 * len(images))
         train_img = images[:ratio]
         print(f"Number of train images: {len(train_img)}")
-        # patches_method(args, train_img, args.device, dataset, "train", args.new_trip, "train_triplets.txt")
         patches_simi_cache(args, train_img, args.device, dataset, "train", args.new_trip, "train_triplets.txt")
