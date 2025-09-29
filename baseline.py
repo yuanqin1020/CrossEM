@@ -100,7 +100,6 @@ def base_method(args, classes, imgs, entity2text=None):
 
     print(f"taking time: {time.time() - start} Sec")
 
-# sentence_method(args, test_unseen_classes, dataset, test_unseen_img, "test_unseen")
 def sentence_method(args, classes, dataset, images):
     start = time.time()
 
@@ -137,20 +136,15 @@ def patches_method(args, images, device, dataset, mode, new_trip, file):
     data = init_ver_emd(vertex_attrs, edges, edge_attr, edge_attrs, model, tokenizer)
     attribute_feats = data.x
 
-    # 加载预训练的ResNet模型
     resnet = resnet18(pretrained=True)
     resnet.eval()
     fc = torch.nn.Linear(1000, 768)
 
-    # 图片转换为tensor并进行预处理
     transform = transforms.Compose([
-        transforms.Resize((224, 224)),  # 调整图片大小
-        transforms.ToTensor(),  # 转换为tensor
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # 标准化
+        transforms.Resize((224, 224)), 
+        transforms.ToTensor(),  
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  
     ])
-
-    # img_patches = image_patches(images, device)
-    # patches = list(img_patches.values())
 
     img_attr = torch.zeros(len(images), len(data.x))
     suff = "_new.txt" if new_trip != "" else ".txt"
@@ -178,21 +172,6 @@ def patches_method(args, images, device, dataset, mode, new_trip, file):
                 print(f"Error occurred while processing image {img}: {e}")
                 continue
 
-                # if pair["attribute"] in ["black footed albatross", "solid", "black", "about the same as head", "medium (9 - 16 in)"]:
-                #     print(pair["attribute"])
-                #     _, ind = torch.max(logits, dim=0)
-                #     img_data = patches[ind].detach().numpy()
-                #     img_shape = img_data.shape
-                #     if len(img_shape) == 3:
-                #         plt.imshow(img_data)
-                #     elif len(img_shape) == 2:
-                #         plt.imshow(img_data, cmap='gray')
-                #     plt.axis('off')
-                #     plt.show()
-
-            # f.write(json.dumps(preprocess, ensure_ascii=False).encode('utf-8'))
-            # json.dump(preprocess, f, ensure_ascii=False)
-
             if i % 100 == 0 or i == len(images) - 1:
                 print(f"preprocess the patches of {i}-th image")
             
@@ -210,25 +189,21 @@ def patches_simi_cache(args, images, device, dataset, mode, new_trip, file):
     data = init_ver_emd(vertex_attrs, edges, edge_attr, edge_attrs, model, tokenizer)
     attribute_feats = data.x
 
-    # 加载预训练的ResNet模型
     resnet = resnet18(pretrained=True)
     resnet.eval()
     fc = torch.nn.Linear(1000, 768)
 
-    # 图片转换为tensor并进行预处理
     transform = transforms.Compose([
-        transforms.Resize((224, 224)),  # 调整图片大小
-        transforms.ToTensor(),  # 转换为tensor
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # 标准化
+        transforms.Resize((224, 224)),  
+        transforms.ToTensor(),  
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  
     ])
 
-    # img_patches = image_patches(images, device)
-    # patches = list(img_patches.values())
+
     img_attr = torch.zeros(len(images), len(data.x))
     suff = "_new.txt" if new_trip != "" else ".txt"
     with open("./cache/feat/logits_preprocess_" + dataset + "_" + mode + suff, 'a') as f:
         for i in range(len(images)):
-            # if i < 9012: continue 
             img = images[i]
             print(f"Patches: {img}")
             try:
@@ -261,27 +236,16 @@ def comparing(root, bert_name, images):
     sentences = ["laysan albatross has underparts color in white", "laysan albatross has eye color in black"]
     sent_features = bert_emd(sentences, model, tokenizer)
 
-    images = ["/home/yuanqin/Align/datasets/img_cf/CUB_200/images/065.Slaty_backed_Gull/Slaty_Backed_Gull_0046_796035.jpg", 
-              "/home/yuanqin/Align/datasets/img_cf/CUB_200/images/053.Western_Grebe/Western_Grebe_0022_36148.jpg",
-              "/home/yuanqin/Align/datasets/img_cf/CUB_200/images/025.Pelagic_Cormorant/Pelagic_Cormorant_0053_23760.jpg", 
-              "/home/yuanqin/Align/datasets/img_cf/CUB_200/images/001.Black_footed_Albatross/Black_Footed_Albatross_0039_796132.jpg",
-              "/home/yuanqin/Align/datasets/img_cf/CUB_200/images/101.White_Pelican/White_Pelican_0048_95764.jpg",
-              "/home/yuanqin/Align/datasets/img_cf/CUB_200/images/002.Laysan_Albatross/Laysan_Albatross_0001_545.jpg",
-              "/home/yuanqin/Align/datasets/img_cf/CUB_200/images/002.Laysan_Albatross/Laysan_Albatross_0002_1027.jpg",
-              "/home/yuanqin/Align/datasets/img_cf/CUB_200/images/002.Laysan_Albatross/Laysan_Albatross_0100_735.jpg",
-              "/home/yuanqin/Align/datasets/img_cf/CUB_200/images/002.Laysan_Albatross/Laysan_Albatross_0017_614.jpg",
-              "/home/yuanqin/Align/datasets/img_cf/CUB_200/images/002.Laysan_Albatross/Laysan_Albatross_0003_1033.jpg"]
+    images = [".../Slaty_Backed_Gull_0046_796035.jpg", ...]
 
-    # 加载预训练的ResNet模型
     resnet = resnet18(pretrained=True)
     resnet.eval()
     fc = torch.nn.Linear(1000, 768)
 
-    # 图片转换为tensor并进行预处理
     transform = transforms.Compose([
-        transforms.Resize((224, 224)),  # 调整图片大小
-        transforms.ToTensor(),  # 转换为tensor
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # 标准化
+        transforms.Resize((224, 224)),  
+        transforms.ToTensor(),  
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  
     ])
 
     img_attr = torch.zeros(len(images), len(sentences))
@@ -308,15 +272,7 @@ def comparing(root, bert_name, images):
             continue
 
 
-
-
-
-
-
 def retrieve_images(image_features, text_features, imgs, classes, true_class_img, tops, task):
-    """
-        Retrieve images for text
-    """
     logits = (100.0 * text_features @ image_features.T).softmax(dim=-1)
 
     pred_class_img = {}
@@ -336,9 +292,6 @@ def retrieve_images(image_features, text_features, imgs, classes, true_class_img
 
 
 def image_classification(image_features, text_features, imgs, classes, true_class_img, tops=1):
-    """
-        Retrieve texts for image: k = 1 (image classification)
-    """
     logits = (100.0 * image_features @ text_features.T).softmax(dim=-1)
 
     pred_class_img = {}
