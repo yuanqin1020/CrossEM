@@ -28,7 +28,7 @@ def read_guidance(file_path):
     dict = {}  
     with open(file_path, 'r') as file:
         for line in file:
-            data = json.loads(line)  # 解析每一行的JSON数据
+            data = json.loads(line)  
             image_path = data['image_path']
             captions = data['caption']
             scores = data['scores']
@@ -54,8 +54,6 @@ def encode_text(self, text):
     x = x.permute(1, 0, 2)  # LND -> NLD
     x = self.ln_final(x).type(self.dtype)
 
-    # x.shape = [batch_size, n_ctx, transformer.width]
-    # take features from the eot embedding (eot_token is the highest number in each sequence)
     x = x[torch.arange(x.shape[0]), text.argmax(dim=-1)] @ self.text_projection
 
     return x
@@ -82,7 +80,6 @@ class GuidedCustomCLIP(nn.Module):
         self.combine = combine
         self.fusion = fusion
         self.fusion_reduction = nn.Linear(self.txt_dim + self.vis_dim, self.vis_dim).half()
-        # self.gud_txt_encoder = GuidedTextEncoder(clip_model)
         
         if self.combine == "features":
             self.merged_feature_head = nn.Sequential(nn.Linear(4 * self.batch_size, self.vis_dim), 
@@ -94,23 +91,17 @@ class GuidedCustomCLIP(nn.Module):
 
         image_features = self.image_encoder(images.type(self.dtype))
         image_features = image_features / image_features.norm(dim=-1, keepdim=True)
-        # print(f"image_features: {image_features.shape}")
 
         prompts, tokenized_prompts = self.prompt_learner(image_features, classnames, clembs, device)
-        # print(f"prompt C: {prompts}, token prompts: {tokenized_prompts}")
 
         text_features = []
         for pts_i in prompts:  # (1, n_cls, n_tkn, tx_dim)
-            # print(f"prompt: {pts_i}, token prompts: {tokenized_prompts}")
             text_feature = self.text_encoder(pts_i, tokenized_prompts)
-            # norm = text_feature.norm(dim=-1, keepdim=True)
-            # norm[norm == 0] = 1  # Set the norm to 1 where it is zero
-            # text_feature = text_feature / norm
+
             text_feature = text_feature / text_feature.norm(dim=-1, keepdim=True)
             text_features.append(text_feature)
 
         text_features = torch.stack(text_features) 
-        # print(f"text_features: {text_features}")
 
         logits = logit_scale * text_features @ image_features.t()
         logits = logits.squeeze()
@@ -121,35 +112,25 @@ class GuidedCustomCLIP(nn.Module):
                 guide_features = self.clip_tencoder(tokenized_giduance).type(self.dtype)
             guide_features = guide_features / guide_features.norm(dim=-1, keepdim=True)
             guide_features = guide_features.view(guide_features.size(0), -1)
-            # print(f"guide_features: {guide_features}")
 
             guide_logits = logit_scale * text_features @ guide_features.t()
             guide_logits = guide_logits.squeeze()
 
         if self.combine == "logits":
-            simi_logits = logits    # (txt, batch)
+            simi_logits = logits   
         elif self.combine == "guidance":
             simi_logits = guide_logits
         elif self.combine == "features":
-            # fusion: concat(image, guide)
             fusion_feat = torch.cat((guide_features, image_features), dim=1).half()
-            fusion_feat = self.fusion_reduction(fusion_feat) # (batch, vis_dim)
-            # print(f"fusion_feat: {fusion_feat.shape}")
+            fusion_feat = self.fusion_reduction(fusion_feat) 
             fuse_logits = logit_scale * text_features @ fusion_feat.t()
             fuse_logits = fuse_logits.squeeze()
             print(f"{logits.shape}, {guide_logits.shape}, {fuse_logits.shape}")
 
-            # merged = torch.cat(
-            #     (logits, guide_logits, logits + guide_logits, logits - guide_logits), dim=1).half().to(self.device) # logits + guide_logits - fuse_logits
-            # print(f"merged: {merged.shape}")
-            # merged_logits = self.merged_feature_head(merged)
-
-            # simi_logits = merged_logits.squeeze()
             simi_logits = fuse_logits
         
         return simi_logits, tokenized_prompts
 
-# Define dataset class for vertices and images
 class GuidedDataset(torch.utils.data.Dataset):
     def __init__(self, image_paths):
         # self.guidances = guidances
@@ -162,9 +143,7 @@ class GuidedDataset(torch.utils.data.Dataset):
         return len(self.images)
     
     def __getitem__(self, idx):
-        # print(f"idx: {idx}")
         img_path = self.images[idx]
-        # guidance = self.guidances[idx]
         
         image = Image.open(img_path)
         image = self.transform(image)
@@ -173,25 +152,18 @@ class GuidedDataset(torch.utils.data.Dataset):
     
 
 def generate_batches(classnames, train_imgs, cluster_num, batch_size, classes_images_simi, c_prune, hns, theta_1, theta_2, bl):
-    # 1. dataset = GuidedDataset(train_imgs, guidances)
-    # dataloader = DataLoader(dataset, batch_size=args.p_batch_size, shuffle=True)
-
-    # 2. dataloaders = generate_batches(train_sets, train_imgs, guidances, args.cluster_num, args.p_batch_size, classes_images_simi)
-    # batch_num = sum([len(dataloader) for dataloader in dataloaders])
-
     dataloaders = []
     if bl in ['pcp', 'hash', "simi"]:
         images_list = block_images(classes_images_simi, classnames, train_imgs, cluster_num, batch_size, c_prune, hns, theta_1, theta_2, bl)
         for ind in range(len(images_list)):
             imgs = images_list[ind]
-            # guides = guidances_list[ind]
             if len(imgs) <= 1: continue
 
             dataset = GuidedDataset(imgs)
             dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
             dataloaders.append(dataloader)
 
-    else: # random
+    else:
         dataset = GuidedDataset(train_imgs)
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
         dataloaders.append(dataloader)
@@ -208,9 +180,6 @@ def guided_train(args, train_sets, train_imgs, k_values, true_class_img, classes
     
     model = GuidedCustomCLIP(args, clip_model, args.combine, args.fusion, args.device, args.p_batch_size)
     model = model.to(args.device)
-
-    # print(f"model: {model}")
-
     print("Turning off gradients in both the image and the text encoder")
     for param in model.text_encoder.parameters():
         param.requires_grad = False
@@ -230,7 +199,6 @@ def guided_train(args, train_sets, train_imgs, k_values, true_class_img, classes
     optimizer = optim.Adam(model.prompt_learner.parameters(), lr=args.p_lr) 
 
     for epoch in range(args.p_epochs):
-        # if epoch > 0: break
 
         total_loss = 0
         epoch_pred = {}
@@ -240,14 +208,9 @@ def guided_train(args, train_sets, train_imgs, k_values, true_class_img, classes
         ep_time = []
         runtime = 0
 
-        # for name, param in model.named_parameters():
-        #     if param.requires_grad:
-        #         print(f"{name}: {param.data}")
-
         for ind in range(len(train_sets)): 
             classnames = list(train_sets[ind].keys())
             if len(classnames) <= 1: continue
-            # print(f"classnames, {len(classnames)}: {classnames}")
 
             embs = list(train_sets[ind].values())        
             model.prompt_learner.initialize_prompts(classnames, train_data, label_freq, label_neighbors)
@@ -270,29 +233,21 @@ def guided_train(args, train_sets, train_imgs, k_values, true_class_img, classes
                 bimg_num = sum(len(imgs) for imgs, _ in dataloader)
                 print(f"Number of classes and images in batch {batch+1}: {len(classnames)}, {bimg_num}")
 
-                for imgs, paths in dataloader: # mini-batches
+                for imgs, paths in dataloader:
                     if len(imgs) <= 1: continue
                     print(f"Number of classes and images in minibatch {mbatch+1}/{len(dataloader)}: {len(classnames)}, {len(imgs)}")
-                    # print(f"classnames: {classnames}")
 
                     imgs = imgs.to(args.device)
-                    # torch.cuda.reset_max_memory_allocated()
                     logits, tokenized_prompts = model(imgs, classnames, embs, args.device, guidances=None) 
-                    # print(f"logits: {logits}")
-
-                    # batch_logits = torch.cat((batch_logits, logits), dim=1)
-                    # batch_path.extend(paths)
-
                     loss = compute_loss(logits, tokenized_prompts, args.oloss)
                 
-                    # loss = sampling_constractive_loss(logits, classnames, paths, classes_images_simi, args.sample_num)
                     torch.autograd.set_detect_anomaly(True)
                     loss.backward(retain_graph=True)
                     optimizer.step()
                     
                     if logits.dim() == 1:
                         logits = torch.unsqueeze(logits, dim=0)
-                    _, predicted = torch.topk(logits, 1, dim=1)  # (batch image, tops) 取相似度最高的top k文本作为图片的预测值
+                    _, predicted = torch.topk(logits, 1, dim=1) 
                     pred_class_img, epoch_pred = retrieve_images(predicted, paths, classnames, epoch_pred)
 
                     batch_loss += loss.item()
@@ -325,7 +280,6 @@ def guided_test(args, test_imgs, test_emb, k_values, true_class_img, test_data, 
     model_path = get_model_path(args).replace(".pt", "_" + args.combine + ".pt")
     print(f"Path of test model: {model_path}")
 
-    # classes = list(test_embeds.keys())
     model = GuidedCustomCLIP(args, clip_model, args.combine, args.fusion, args.device, args.p_batch_size).to(args.device)
     model.load_state_dict(torch.load(model_path), strict=False)
     model.eval()
@@ -358,7 +312,6 @@ def guided_test(args, test_imgs, test_emb, k_values, true_class_img, test_data, 
             similarity.append(logits)
         
         similarity = torch.cat(similarity, dim=1)
-        # print(f"simi: {similarity.shape}")
 
         _, predicted = torch.topk(similarity, args.tops, dim=1)  
         _, pred_class_img = retrieve_images(predicted, test_imgs, classnames, pred_class_img)
@@ -374,7 +327,6 @@ def guided_pipline(args, train_img, train_sets, test_unseen_img, test_unseen_emb
     if args.p_mode =="train":
         true_class_img = true_targets(train_img, args.data)
         
-        # train_guides = batch_guidance(read_guidance(args.root + "cache/guidance/train_" + dataset + "_with_guidance.json"), train_img)
         guided_train(args, train_sets, train_img, k_values, true_class_img, classes_images_simi, train_data, label_freq, label_neighbors)
 
 
@@ -382,6 +334,5 @@ def guided_pipline(args, train_img, train_sets, test_unseen_img, test_unseen_emb
     test_emb = {**test_unseen_embs}
     true_class_img = true_targets(test_img, args.data)
     
-    # test_guide = batch_guidance(read_guidance(args.root + "cache/guidance/test_unseen_" + dataset + "_with_guidance.json"), test_img)
     guided_test(args, test_img, test_emb, k_values, true_class_img, data, label_freq, label_neighbors)
 
