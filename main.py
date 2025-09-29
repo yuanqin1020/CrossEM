@@ -17,7 +17,7 @@ os.environ['CUDA_LAUNCH_BLOCKING'] = "0,1"
 
 def setup_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root", type=str, default="/home/zhangjunyu/yq/Align/", help="path to dataset") #   /home/yuanqin/Align/
+    parser.add_argument("--root", type=str, default="...", help="path to dataset") 
     parser.add_argument('--bert_name', default='bert-base-uncased', type=str, help="Pretrained language model name, bart-base or bart-large")
     parser.add_argument("--clip", type=str, default="", help="")
     parser.add_argument("--output", type=str, default="output/", help="output directory")
@@ -142,7 +142,6 @@ if __name__ == "__main__":
                                k_values, label_freq, label_neighbors)
 
             elif args.method == "guided":
-                # _, train_embs, test_seen_embs, test_unseen_embs, train_data = graph_processor(args, train_classes, test_seen_classes, test_unseen_classes)
                 guided_pipline(args, train_img, train_sets, test_unseen_img, test_unseen_embs, dataset, 
                                k_values, classes_images_simi, train_data, data, label_freq, label_neighbors)
 
@@ -153,21 +152,15 @@ if __name__ == "__main__":
         train_embs, train_data, train_label_neighbors, train_label_freq = kg_graph_train(args)
 
         images = read_image_path(args.root + args.data + args.image, dataset, entity2text, train_data.y)
-        # true_class_img = true_targets(images, args.data, entity2text)
         print(f"Number of total images: {len(images)}")
 
         ratio = int(0.7 * len(images))
         train_img = images[:ratio]
         test_img = images[ratio:]
-        # patches_simi_cache(args, train_img, args.device, dataset, "train", args.new_trip, "train_triplets.txt")
-        # gen_guidence(args.root + "cache/guidance/", dataset, test_img, "train", args.device)
 
         test_embs, test_data, test_label_neighbors, test_label_freq = kg_graph_infer(args)
         print(f"Number of train entities and relations: {len(train_data.x)}, {train_data.edge_index.shape}, train images: {len(train_img)}")
         print(f"Number of test entities and relations: {len(test_data.x)}, {test_data.edge_index.shape}, images: {len(test_img)}")
-
-        # train_classes = remove_leaf(train_embs, train_data)
-        # test_classes = remove_leaf(test_embs, test_data)
 
         train_classes = list(train_embs.keys())
         test_classes = list(test_embs.keys())
